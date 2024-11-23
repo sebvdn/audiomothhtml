@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enregistreur Audio Planifié</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f4f9;
+        }
+        .container {
+            width: 90%;
+            max-width: 600px;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            margin-top: 10px;
+            font-size: 1rem;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .start-recording {
+            background-color: #007bff;
+        }
+        .stop-recording {
+            background-color: #dc3545;
+        }
+        .status {
+            margin-top: 20px;
+            font-size: 1rem;
+            color: #333;
+        }
+        .schedule {
+            margin-top: 30px;
+            text-align: left;
+        }
+        .schedule input {
+            margin-right: 10px;
+        }
+        table {
+            width: 100%;
+            margin-top: 30px;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        th, td {
+            padding: 8px;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .schedule-btn {
+            margin-top: 10px;
+            background-color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Enregistreur Audio Planifié</h1>
+
+        <!-- Boutons pour démarrer et arrêter l'enregistrement -->
+        <button id="startRecording" class="start-recording">Démarrer l'enregistrement</button>
+        <button id="stopRecording" class="stop-recording" disabled>Arrêter l'enregistrement</button>
+
+        <div class="status" id="status">Statut: Inactif</div>
+
+        <!-- Section de planification -->
+        <div class="schedule">
+            <h3>Planification Hebdomadaire</h3>
+            <label><input type="checkbox" value="Lundi"> Lundi</label>
+            <label><input type="checkbox" value="Mardi"> Mardi</label>
+            <label><input type="checkbox" value="Mercredi"> Mercredi</label>
+            <label><input type="checkbox" value="Jeudi"> Jeudi</label>
+            <label><input type="checkbox" value="Vendredi"> Vendredi</label>
+            <label><input type="checkbox" value="Samedi"> Samedi</label>
+            <label><input type="checkbox" value="Dimanche"> Dimanche</label>
+            <br><br>
+            <label>Heure de début: <input type="time" id="startTime"></label>
+            <label>Durée (minutes): <input type="number" id="duration" min="1" value="1"></label>
+            <button id="saveSchedule" class="schedule-btn">Sauvegarder la planification</button>
+        </div>
+
+        <!-- Tableau des enregistrements programmés -->
+        <h3>Enregistrements Programmés</h3>
+        <table id="scheduleTable">
+            <thead>
+                <tr>
+                    <th>Jour</th>
+                    <th>Heure de début</th>
+                    <th>Durée (min)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Les enregistrements programmés seront affichés ici -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        const startRecordingButton = document.getElementById("startRecording");
+        const stopRecordingButton = document.getElementById("stopRecording");
+        const statusDiv = document.getElementById("status");
+        const saveScheduleButton = document.getElementById("saveSchedule");
+        const scheduleTable = document.getElementById("scheduleTable").getElementsByTagName("tbody")[0];
+
+        // Tableau des enregistrements programmés
+        let schedule = [];
+
+        // Fonction pour démarrer l'enregistrement
+        async function startRecording(duration) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+
+                audioChunks = [];
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+                    const audioURL = URL.createObjectURL(audioBlob);
+
+                    // Créer un lien pour télécharger l'enregistrement
+                    const link = document.createElement("a");
+                    link.href = audioURL;
+                    link.download = `enregistrement-${Date.now()}.wav`; // Sauvegarde en WAV
+                    link.click();
+
+                    statusDiv.textContent = "Statut: Enregistrement sauvegardé.";
+                };
+
+                mediaRecorder.start();
+                statusDiv.textContent = "Statut: Enregistrement en cours...";
+                startRecordingButton.disabled = true;
+                stopRecordingButton.disabled = false;
+
+                // Arrêter l'enregistrement après la durée définie
+                setTimeout(() => {
+                    mediaRecorder.stop();
+                    startRecordingButton.disabled = false;
+                    stopRecordingButton.disabled = true;
+                    statusDiv.textContent = "Statut: Enregistrement terminé.";
+                }, duration * 60000); // Durée en minutes convertie en millisecondes
+            } catch (error) {
+                console.error("Erreur lors de l'enregistrement:", error);
+                statusDiv.textContent = "Statut: Impossible de démarrer l'enregistrement.";
+            }
+        }
+
+        // Fonction pour arrêter l'enregistrement
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+                startRecordingButton.disabled = false;
+                stopRecordingButton.disabled = true;
+                statusDiv.textContent = "Statut: Arrêt de l'enregistrement...";
+            }
+        }
+
+        // Ajouter des événements aux boutons
+        startRecordingButton.addEventListener("click", () => {
+            const duration = document.getElementById("duration").value || 1; // Durée par défaut = 1 min
+            startRecording(duration);
+        });
+        stopRecordingButton.addEventListener("click", stopRecording);
+
+        // Fonction pour sauvegarder la planification
+        saveScheduleButton.addEventListener("click", () => {
+            const days = Array.from(document.querySelectorAll('.schedule input:checked')).map(input => input.value);
+            const startTime = document.getElementById("startTime").value;
+            const duration = document.getElementById("duration").value;
+
+            if (days.length === 0 || !startTime || !duration) {
+                alert("Veuillez sélectionner au moins un jour, spécifier l'heure de début et la durée.");
+                return;
+            }
+
+            days.forEach(day => {
+                schedule.push({ day, startTime, duration });
+                // Ajouter la planification au tableau
+                const row = scheduleTable.insertRow();
+                row.insertCell(0).textContent = day;
+                row.insertCell(1).textContent = startTime;
+                row.insertCell(2).textContent = duration;
+            });
+
+            statusDiv.textContent = `Statut: Planification enregistrée pour ${days.length} jour(s).`;
+            console.log("Planification:", schedule);
+
+            startScheduler();  // Démarre le planificateur
+        });
+
+        // Planificateur hebdomadaire
+        function startScheduler() {
+            setInterval(() => {
+                const now = new Date();
+                const day = now.toLocaleString("fr-FR", { weekday: "long" }).toLowerCase();
+                const time = now.toTimeString().slice(0, 5); // Heure actuelle au format HH:MM
+
+                // Vérifier si l'enregistrement doit démarrer selon la planification
+                schedule.forEach(({ day: scheduledDay, startTime, duration }) => {
+                    if (day === scheduledDay.toLowerCase() && time === startTime) {
+                        startRecordingButton.click();
+                    }
+                });
+            }, 60000); // Vérifie toutes les minutes
+        }
+    </script>
+</body>
+</html>
